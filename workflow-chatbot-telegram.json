@@ -1,0 +1,490 @@
+{
+  "name": "[Telegram API do Tempo]",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Cidade: {{ $('Information Extractor').item.json.output.city }}\nEstado: {{ $('Information Extractor').item.json.output.state }}\nTemperatura: {{ $('get_weather').item.json.main.temp }}\nDescrição: {{ $('get_weather').item.json.weather[0].main }} - {{ $('get_weather').item.json.weather[0].description }}",
+        "options": {
+          "systemMessage": "=Papel\nVocê é o Sentinela do Clima, um assistente meteorológico inteligente e carismático. Sua missão é transformar dados brutos de temperatura em comunicações amigáveis, claras e visualmente ricas para o usuário final.\n\nInstruções de Resposta\nArredondamento: Sempre converta a temperatura recebida para o número inteiro mais próximo (ex: 22.4 vira 22, 22.5 vira 23).\n\nVariabilidade: Não use sempre a mesma frase. Alterne entre saudações, observações curtas ou apenas o anúncio direto do clima. Seja natural e amigável.\n\nElementos Obrigatórios: Toda resposta deve conter obrigatoriamente:\n\nO nome da cidade.\n\nA temperatura arredondada acompanhada de \"°C\".\n\nUm emoji que symbolize o estado atual do tempo (use o contexto da temperatura para escolher: ☀️ para calor, ☁️ para nublado/fresco, ❄️ para frio, etc).\n\nExemplos de Tom de Voz\n“Fala! Em São Paulo agora está batendo 22°C ☀️.”\n\n“O clima em Curitiba está em 15°C hoje ☁️.”\n\n“Passando para avisar que em Salvador faz um calor de 30°C 🌡️!”"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        720,
+        -80
+      ],
+      "id": "ca70d6a3-7e68-4711-9fb2-3fb29b0de06c",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.message.text }}",
+        "attributes": {
+          "attributes": [
+            {
+              "name": "=city",
+              "description": "Nome Da Cidade Mencionada Pelo Usuário.  A Cidade Deve Estar Acompanhada Da Sigla Do Estado (UF) Na Mensagem. Não Tente Adivinhar Ou Inferir O Estado.  Remova Acentos E Espaços Extras E Converta Para Letras Minúsculas. Retorne Apenas O Nome Da Cidade.  Exemplo Válido De Entrada Do Usuário: \"Natal RN\" \"São Paulo SP\"",
+              "required": true
+            },
+            {
+              "name": "state",
+              "description": "Sigla do estado brasileiro (UF) mencionada explicitamente pelo usuário.  Retorne apenas a sigla com duas letras em maiúsculo.  Não inferir ou deduzir o estado com base na cidade. Se o usuário não mencionar o estado, este campo deve ficar vazio.",
+              "required": true
+            },
+            {
+              "name": "queue",
+              "description": "Consulta formatada para a API OpenWeather no formato: cidade,estado,BR.\n\nA cidade deve estar sem acentos e em letras minúsculas.\n\nSó gerar esse valor se cidade e estado estiverem presentes na mensagem do usuário. Caso contrário, retornar vazio.",
+              "required": true
+            },
+            {
+              "name": "valid_request",
+              "type": "boolean",
+              "description": "Retorne true apenas se o usuário informar explicitamente:  cidade + estado brasileiro (UF).  Retorne false se: - o estado não for informado - a cidade não for do Brasil - o pedido não estiver relacionado ao clima - houver apenas o nome da cidade sem UF  Nunca deduza nenhuma informação.",
+              "required": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [
+        -496,
+        16
+      ],
+      "id": "8eea142a-22b4-4f3e-b40b-ad2ff8210491",
+      "name": "Information Extractor"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7e434c4b-df94-4a12-8776-2ce921c4fb48",
+              "name": "queue",
+              "value": "={{ $json.output.queue.toLowerCase() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        48,
+        -64
+      ],
+      "id": "e6078400-7969-4075-8f0d-29609b7ad293",
+      "name": "set_queue"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "fcf687b5-1407-4fdd-9131-894ae1ba6764",
+              "leftValue": "={{ $json.output.valid_request }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -176,
+        16
+      ],
+      "id": "85326c56-34f3-4a16-9ff9-d878a02c6587",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "url": "https://api.openweathermap.org/data/2.5/weather",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.queue }}"
+            },
+            {
+              "name": "units",
+              "value": "metric"
+            },
+            {
+              "name": "lang",
+              "value": "pt_br"
+            },
+            {
+              "name": "appid",
+              "value": "{{ $env.OPENWEATHER_API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {}
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        208,
+        -64
+      ],
+      "id": "0f929b11-2f69-46ee-9c3d-e0093f5129aa",
+      "name": "get_weather",
+      "retryOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -704,
+        16
+      ],
+      "id": "1a8da4f3-23f9-47a6-96aa-36a1f3307474",
+      "name": "input",
+      "webhookId": "6ceea796-703e-46f3-a9c5-5be23fdef5fd",
+      "credentials": {
+        "telegramApi": {
+          "id": "nqL0gG41xLK1pnOF",
+          "name": "clima_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0fc82716-077b-4ecb-84fe-1f0a5be31e32",
+              "leftValue": "={{ $json.main.temp }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        368,
+        -64
+      ],
+      "id": "85730cc2-4b8d-4429-ba56-6fbfb29f6b0f",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('input').item.json.message.from.id }}",
+        "text": "❌ Cidade não encontrada. Use o formato Cidade,UF (ex.: São Paulo,SP).",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        16,
+        144
+      ],
+      "id": "c9fad83b-49b7-4472-8642-686752ae7fad",
+      "name": "send_message_no_data",
+      "webhookId": "997143c7-2596-4999-b774-08ea00ca83f1",
+      "credentials": {
+        "telegramApi": {
+          "id": "nqL0gG41xLK1pnOF",
+          "name": "clima_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('input').item.json.message.from.id }}",
+        "text": "Ih, parece que o termômetro sumiu! 🌡️ Não consegui verificar a temperatura no momento.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        512,
+        80
+      ],
+      "id": "1c266fe8-4acd-4075-a5f6-ac3969ea8989",
+      "name": "send_message_no_temperature",
+      "webhookId": "997143c7-2596-4999-b774-08ea00ca83f1",
+      "credentials": {
+        "telegramApi": {
+          "id": "nqL0gG41xLK1pnOF",
+          "name": "clima_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('input').item.json.message.from.id }}",
+        "text": "={{$json.output}}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1008,
+        -80
+      ],
+      "id": "a7fffdcc-6f8a-4fd4-9d98-a2a089a28cc7",
+      "name": "send_message_success",
+      "webhookId": "997143c7-2596-4999-b774-08ea00ca83f1",
+      "credentials": {
+        "telegramApi": {
+          "id": "nqL0gG41xLK1pnOF",
+          "name": "clima_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -496,
+        176
+      ],
+      "id": "4ba405b4-10eb-41ef-b397-aea5364095d4",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "ZFyorvJM5mNdUSVW",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        720,
+        112
+      ],
+      "id": "e939b32e-a2bf-4427-8e15-3748ef4ebb12",
+      "name": "Groq Chat Model1",
+      "credentials": {
+        "groqApi": {
+          "id": "ZFyorvJM5mNdUSVW",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('input').item.json.message.from.id }}",
+        "text": "Puxa, meus sensores quebraram, vou tentar consertar! ☁️ Que tal tentarmos o nome da cidade de novo?",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        320,
+        80
+      ],
+      "id": "3c50a195-4e3d-4978-9769-ee6df134f5d8",
+      "name": "send_message_api_failed",
+      "webhookId": "997143c7-2596-4999-b774-08ea00ca83f1",
+      "credentials": {
+        "telegramApi": {
+          "id": "nqL0gG41xLK1pnOF",
+          "name": "clima_bot"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Information Extractor": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "set_queue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "send_message_no_data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_queue": {
+      "main": [
+        [
+          {
+            "node": "get_weather",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "input": {
+      "main": [
+        [
+          {
+            "node": "Information Extractor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_weather": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "send_message_api_failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "send_message_no_temperature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "send_message_success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Information Extractor",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "29d8be6b-904c-4942-8141-8fda5b8e0ceb",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8a20fd0f29c18bf6cc306f217daa818d3d4dae15438b0dd3c2c94c0c6528448f"
+  },
+  "id": "mU9ZoK4kFFnVMPoj",
+  "tags": []
+}
